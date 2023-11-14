@@ -1,0 +1,105 @@
+version: '3.3'
+services:
+  adminer:
+    image: adminer
+    environment:
+      ADMINER_DEFAULT_SERVER: germinate_mysql # name of germinate_mysql container
+      ADMINER_DESIGN: dracula
+    restart: unless-stopped
+    ports:
+      - 8080:8080
+    container_name: adminer #name of adminer container
+  # This is Germinate's MySQL database.
+  germinate_mysql:
+    image: mysql:5.7
+    # We're exposing the MySQL port for remote access at 9308
+    ports:
+      - 9308:3306
+    volumes:
+      - type: volume
+        source: germinate_mysql
+        target: /var/lib/mysql/
+    environment:
+      # The root password. This is not used by Germinate, but can be used to access the database externally
+      MYSQL_ROOT_PASSWORD: germinate 
+      # The name of the Germinate database, e.g. "germinate". Use this for 'database.name'.
+      MYSQL_DATABASE: germinate
+      # The username Germinate will use to connect to this database. Use this for 'database.username'.
+      MYSQL_USER: germinate-username
+      # The password Germinate will use to connect to this database. Use this for 'database.password'.
+      MYSQL_PASSWORD: germinate-password
+    restart: unless-stopped
+    # This is the name of the container. It's also what has to be used when trying to access the database from Germinate, e.g. 'database.server' is this value.
+    container_name: germinate_mysql # name of germinate_mysql container
+
+  # This is Germinate itself
+  germinate:
+      image: cropgeeks/germinate:release-4.5.0
+      environment:
+        - JAVA_OPTS:-Xmx4g
+      # We're exposing port 8080 at 9080 to access the interface
+      ports:
+        - 9080:8080
+      volumes:
+        - type: bind
+          # This points to where your Germinate configuration folder is outside the container
+          source: ./config/germinate
+          target: /data/germinate
+        - type: volume
+          source: germinate
+          target: /usr/local/tomcat/temp
+      restart: unless-stopped
+      container_name: germinate
+      depends_on:
+        - "germinate_mysql"
+
+  # This is Gatekeeper's MySQL container
+  gatekeeper_mysql:
+    image: mysql:5.7
+    # We're also exposing the port, this time on 9309
+    ports:
+      - 9309:3306
+    volumes:
+      - type: volume
+        source: gatekeeper_mysql
+        target: /var/lib/mysql/
+    environment:
+      # The root password. This is not used by Gatekeeper, but can be used to access the database externally
+      MYSQL_ROOT_PASSWORD: gatekeeper
+      # The name of the Gatekeeper database, e.g. "gatekeeper". Use this for 'database.name'.
+      MYSQL_DATABASE: gatekeeper
+      # The username Gatekeeper will use to connect to this database. Use this for 'database.username'.
+      MYSQL_USER: gatekeeper-username
+      # The password Gatekeeper will use to connect to this database. Use this for 'database.password'.
+      MYSQL_PASSWORD: gatekeeper-password
+    restart: unless-stopped
+    # This is the name of the container. It's used in the 'config.properties' of Gatekeeper for 'database.server'
+    container_name: gatekeeper_mysql # name of the gatekeeper_mysql container
+
+  # This is Gatekeeper itself.
+  gatekeeper:
+      image: cropgeeks/gatekeeper:release-4.3.0
+      environment:
+        - JAVA_OPTS:-Xmx512m
+      # Expose port 8080 at 9081
+      ports:
+        - 9081:8080
+      volumes:
+        - type: bind
+          # This points to where your Gatekeeper configuration folder is outside the container
+          source: ./config/gatekeeper
+          target: /data/gatekeeper
+        - type: volume
+          source: gatekeeper
+          target: /usr/local/tomcat/temp
+      restart: unless-stopped
+      container_name: gatekeeper
+      depends_on:
+        - "gatekeeper_mysql"
+
+volumes:
+  germinate:
+  germinate_mysql:
+  gatekeeper:
+  gatekeeper_mysql:
+  adminer:
